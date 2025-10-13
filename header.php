@@ -9,10 +9,13 @@
             <nav>
                 <ul id="navMenu">
                     <li><a href="index.php">Home</a></li>
-                    <li><a href="#">Articles</a></li>
-                    <li><a href="#">Research</a></li>
-                    <li><a href="about.php">About</a></li>
+            <li><a href="about.php">About</a></li>
                     <li><a href="contact.php">Contact</a></li>
+                        <li><a href="register.php">create account</a></li>
+                        <li><a href="login1.php">sin in</a></li>
+                
+                    
+        
                 </ul>
             </nav>
 
