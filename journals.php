@@ -7,27 +7,37 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     exit;
 }
 
-// Database configuration
+// Database connection
 $servername = "localhost";
 $username = "root";
 $password = "";
 $dbname = "jahan_journal";
-
-// Create connection
 $conn = new mysqli($servername, $username, $password, $dbname);
+if ($conn->connect_error) die("Connection failed: " . $conn->connect_error);
 
-// Check connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+// 🔹 Handle Approve/Reject Actions
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action'], $_POST['paper_id'])) {
+    $paper_id = intval($_POST['paper_id']);
+    $action = $_POST['action'];
+
+    if (in_array($action, ['approve', 'reject'])) {
+        $status = ($action === 'approve') ? 'approved' : 'rejected';
+        $stmt = $conn->prepare("UPDATE research_paper_submissions SET status=? WHERE id=?");
+        $stmt->bind_param("si", $status, $paper_id);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    // Refresh page safely
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
 }
 
-// Fetch journals from database
+// Fetch journals
 $sql = "SELECT * FROM research_paper_submissions ORDER BY submission_date DESC";
 $result = $conn->query($sql);
-
-// Close connection
-$conn->close();
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -298,59 +308,73 @@ $conn->close();
                     </div>
                 </div>
 
-                <!-- Journals Table -->
-                <div class="card card-custom shadow mb-4">
-                    <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                        <h6 class="m-0 font-weight-bold text-primary">All Journal Submissions</h6>
-                        <div>
-                            <button class="btn btn-sm btn-primary"><i class="bi bi-download"></i> Export</button>
-                            <button class="btn btn-sm btn-success"><i class="bi bi-funnel"></i> Filter</button>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table id="journalsTable" class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Author</th>
-                                        <th>University</th>
-                                        <th>Paper Title</th>
-                                        <th>Province</th>
-                                        <th>Submission Date</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php
-                                    if ($result->num_rows > 0) {
-                                        while($row = $result->fetch_assoc()) {
-                                            echo "<tr>";
-                                            echo "<td>" . $row['id'] . "</td>";
-                                            echo "<td>" . $row['author_first_name'] . " " . $row['author_last_name'] . "<br><small class='text-muted'>" . $row['author_email'] . "</small></td>";
-                                            echo "<td>" . $row['university_name'] . "<br><small class='text-muted'>" . $row['department_name'] . "</small></td>";
-                                            echo "<td>" . $row['paper_title'] . "</td>";
-                                            echo "<td>" . $row['province'] . "</td>";
-                                            echo "<td>" . date('M j, Y', strtotime($row['submission_date'])) . "</td>";
-                                            echo "<td>
-                                                    <button class='btn btn-sm btn-view' data-bs-toggle='modal' data-bs-target='#journalModal' data-id='" . $row['id'] . "'>
-                                                        <i class='bi bi-eye'></i> Details
-                                                    </button>
-                                                    <a href='" . $row['pdf_file'] . "' class='btn btn-sm btn-view'>View PDF</a>
-                                                  </td>";
-                                            echo "</tr>";
-                                        }
-                                    } else {
-                                        echo "<tr><td colspan='7' class='text-center'>No journals found</td></tr>";
-                                    }
-                                    ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
+  <!-- Journals Table -->
+<div class="card card-custom shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">All Journal Submissions</h6>
+        <div>
+            <button class="btn btn-sm btn-primary"><i class="bi bi-download"></i> Export</button>
+            <button class="btn btn-sm btn-success"><i class="bi bi-funnel"></i> Filter</button>
         </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table id="journalsTable" class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Author</th>
+                        <th>University</th>
+                        <th>Paper Title</th>
+                        <th>Province</th>
+                        <th>Submission Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    if ($result->num_rows > 0) {
+                        while($row = $result->fetch_assoc()) {
+                            echo "<tr>";
+                            echo "<td>{$row['id']}</td>";
+                            echo "<td>{$row['author_first_name']} {$row['author_last_name']}<br><small class='text-muted'>{$row['author_email']}</small></td>";
+                            echo "<td>{$row['university_name']}<br><small class='text-muted'>{$row['department_name']}</small></td>";
+                            echo "<td>{$row['paper_title']}</td>";
+                            echo "<td>{$row['province']}</td>";
+                            echo "<td>" . date('M j, Y', strtotime($row['submission_date'])) . "</td>";
+
+                            // Status badge
+                            $status = $row['status'] ?? 'pending';
+                            if ($status === 'approved') $badge = "<span class='badge bg-success mb-1'>Approved</span>";
+                            elseif ($status === 'rejected') $badge = "<span class='badge bg-danger mb-1'>Rejected</span>";
+                            else $badge = "<span class='badge bg-secondary mb-1'>Pending</span>";
+
+                            echo "<td>
+                                $badge<br>
+                                <button class='btn btn-sm btn-view mb-1' data-bs-toggle='modal' data-bs-target='#journalModal' data-id='{$row['id']}'><i class='bi bi-eye'></i> Details</button>
+                                <a href='{$row['pdf_file']}' class='btn btn-sm btn-view mb-1'>View PDF</a><br>
+                                <form method='POST' style='display:inline-block'>
+                                    <input type='hidden' name='paper_id' value='{$row['id']}'>
+                                    <button type='submit' name='action' value='approve' class='btn btn-sm btn-success mb-1'><i class='bi bi-check-circle'></i> Approve</button>
+                                </form>
+                                <form method='POST' style='display:inline-block'>
+                                    <input type='hidden' name='paper_id' value='{$row['id']}'>
+                                    <button type='submit' name='action' value='reject' class='btn btn-sm btn-danger mb-1'><i class='bi bi-x-circle'></i> Reject</button>
+                                </form>
+                            </td>";
+
+                            echo "</tr>";
+                        }
+                    } else {
+                        echo "<tr><td colspan='7' class='text-center'>No journals found</td></tr>";
+                    }
+                    ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
     </div>
 
     <!-- Journal Details Modal -->

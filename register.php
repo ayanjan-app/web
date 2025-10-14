@@ -238,7 +238,7 @@
             </form>
             
             <div class="login-link">
-                Already have an account? <a href="login1.php">Sign In</a>
+                Already have an account? <a href="login.php">Sign In</a>
             </div>
         </div>
     </div>
