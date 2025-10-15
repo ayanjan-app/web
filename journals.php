@@ -33,6 +33,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action'], $_POST['pap
     exit;
 }
 
+// 🔹 Handle Comment Submission
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['comment_text'], $_POST['paper_id'])) {
+    $paper_id = intval($_POST['paper_id']);
+    $comment = trim($_POST['comment_text']);
+
+    if (!empty($comment)) {
+        $stmt = $conn->prepare("UPDATE research_paper_submissions SET comment=? WHERE id=?");
+        $stmt->bind_param("si", $comment, $paper_id);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    // Refresh page safely
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
 // Fetch journals
 $sql = "SELECT * FROM research_paper_submissions ORDER BY submission_date DESC";
 $result = $conn->query($sql);
@@ -308,91 +325,130 @@ $result = $conn->query($sql);
                     </div>
                 </div>
 
-  <!-- Journals Table -->
-<div class="card card-custom shadow mb-4">
-    <div class="card-header py-3 d-flex justify-content-between align-items-center">
-        <h6 class="m-0 font-weight-bold text-primary">All Journal Submissions</h6>
-        <div>
-            <button class="btn btn-sm btn-primary"><i class="bi bi-download"></i> Export</button>
-            <button class="btn btn-sm btn-success"><i class="bi bi-funnel"></i> Filter</button>
-        </div>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table id="journalsTable" class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Author</th>
-                        <th>University</th>
-                        <th>Paper Title</th>
-                        <th>Province</th>
-                        <th>Submission Date</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    if ($result->num_rows > 0) {
-                        while($row = $result->fetch_assoc()) {
-                            echo "<tr>";
-                            echo "<td>{$row['id']}</td>";
-                            echo "<td>{$row['author_first_name']} {$row['author_last_name']}<br><small class='text-muted'>{$row['author_email']}</small></td>";
-                            echo "<td>{$row['university_name']}<br><small class='text-muted'>{$row['department_name']}</small></td>";
-                            echo "<td>{$row['paper_title']}</td>";
-                            echo "<td>{$row['province']}</td>";
-                            echo "<td>" . date('M j, Y', strtotime($row['submission_date'])) . "</td>";
+                <!-- Journals Table -->
+                <div class="card card-custom shadow mb-4">
+                    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                        <h6 class="m-0 font-weight-bold text-primary">All Journal Submissions</h6>
+                        <div>
+                            <button class="btn btn-sm btn-primary"><i class="bi bi-download"></i> Export</button>
+                            <button class="btn btn-sm btn-success"><i class="bi bi-funnel"></i> Filter</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table id="journalsTable" class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Author</th>
+                                        <th>University</th>
+                                        <th>Paper Title</th>
+                                        <th>Province</th>
+                                        <th>Submission Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    if ($result->num_rows > 0) {
+                                        while($row = $result->fetch_assoc()) {
+                                            echo "<tr>";
+                                            echo "<td>{$row['id']}</td>";
+                                            echo "<td>{$row['author_first_name']} {$row['author_last_name']}<br><small class='text-muted'>{$row['author_email']}</small></td>";
+                                            echo "<td>{$row['university_name']}<br><small class='text-muted'>{$row['department_name']}</small></td>";
+                                            echo "<td>{$row['paper_title']}</td>";
+                                            echo "<td>{$row['province']}</td>";
+                                            echo "<td>" . date('M j, Y', strtotime($row['submission_date'])) . "</td>";
 
-                            // Status badge
-                            $status = $row['status'] ?? 'pending';
-                            if ($status === 'approved') $badge = "<span class='badge bg-success mb-1'>Approved</span>";
-                            elseif ($status === 'rejected') $badge = "<span class='badge bg-danger mb-1'>Rejected</span>";
-                            else $badge = "<span class='badge bg-secondary mb-1'>Pending</span>";
+                                            // Status badge
+                                            $status = $row['status'] ?? 'pending';
+                                            if ($status === 'approved') $badge = "<span class='badge bg-success mb-1'>Approved</span>";
+                                            elseif ($status === 'rejected') $badge = "<span class='badge bg-danger mb-1'>Rejected</span>";
+                                            else $badge = "<span class='badge bg-secondary mb-1'>Pending</span>";
 
-                            echo "<td>
-                                $badge<br>
-                                <button class='btn btn-sm btn-view mb-1' data-bs-toggle='modal' data-bs-target='#journalModal' data-id='{$row['id']}'><i class='bi bi-eye'></i> Details</button>
-                                <a href='{$row['pdf_file']}' class='btn btn-sm btn-view mb-1'>View PDF</a><br>
-                                <form method='POST' style='display:inline-block'>
-                                    <input type='hidden' name='paper_id' value='{$row['id']}'>
-                                    <button type='submit' name='action' value='approve' class='btn btn-sm btn-success mb-1'><i class='bi bi-check-circle'></i> Approve</button>
-                                </form>
-                                <form method='POST' style='display:inline-block'>
-                                    <input type='hidden' name='paper_id' value='{$row['id']}'>
-                                    <button type='submit' name='action' value='reject' class='btn btn-sm btn-danger mb-1'><i class='bi bi-x-circle'></i> Reject</button>
-                                </form>
-                            </td>";
+                                            echo "<td>
+                                                $badge<br>
+                                                <button class='btn btn-sm btn-view mb-1' data-bs-toggle='modal' data-bs-target='#journalModal' data-id='{$row['id']}'><i class='bi bi-eye'></i> Details</button>
+                                                <a href='{$row['pdf_file']}' class='btn btn-sm btn-view mb-1'>View PDF</a><br>
+                                                
+                                                <!-- Comment Button -->
+                                                <button class='btn btn-sm btn-info mb-1' data-bs-toggle='modal' data-bs-target='#commentModal' 
+                                                        data-paper-id='{$row['id']}' data-existing-comment='".htmlspecialchars($row['comment'] ?? '')."'>
+                                                    <i class='bi bi-chat-left-text'></i> Comment
+                                                </button><br>
+                                                
+                                                <form method='POST' style='display:inline-block'>
+                                                    <input type='hidden' name='paper_id' value='{$row['id']}'>
+                                                    <button type='submit' name='action' value='approve' class='btn btn-sm btn-success mb-1'><i class='bi bi-check-circle'></i> Approve</button>
+                                                </form>
+                                                <form method='POST' style='display:inline-block'>
+                                                    <input type='hidden' name='paper_id' value='{$row['id']}'>
+                                                    <button type='submit' name='action' value='reject' class='btn btn-sm btn-danger mb-1'><i class='bi bi-x-circle'></i> Reject</button>
+                                                </form>
+                                            </td>";
 
-                            echo "</tr>";
-                        }
-                    } else {
-                        echo "<tr><td colspan='7' class='text-center'>No journals found</td></tr>";
-                    }
-                    ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-    </div>
-
-    <!-- Journal Details Modal -->
-    <div class="modal fade" id="journalModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Journal Details</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body" id="journalDetails">
-                    <!-- Details will be loaded via JavaScript -->
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                            echo "</tr>";
+                                        }
+                                    } else {
+                                        echo "<tr><td colspan='7' class='text-center'>No journals found</td></tr>";
+                                    }
+                                    ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+
+        <!-- Journal Details Modal -->
+        <div class="modal fade" id="journalModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Journal Details</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" id="journalDetails">
+                        <!-- Details will be loaded via JavaScript -->
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comment Modal -->
+        <div class="modal fade" id="commentModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Add Comment</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form method="POST">
+                        <div class="modal-body">
+                            <input type="hidden" name="paper_id" id="comment_paper_id">
+                            <div class="mb-3">
+                                <label for="comment_text" class="form-label">Comment:</label>
+                                <textarea class="form-control" id="comment_text" name="comment_text" rows="4" placeholder="Enter your comment here..."></textarea>
+                            </div>
+                            <!-- Display existing comment if any -->
+                            <div id="existing_comment" class="mt-3" style="display: none;">
+                                <h6>Existing Comment:</h6>
+                                <div class="alert alert-info" id="current_comment_text"></div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Comment</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Bootstrap 5 JS Bundle with Popper -->
@@ -445,6 +501,35 @@ $result = $conn->query($sql);
                 `);
                 
                 modal.find('#viewPdf').attr('href', 'uploads/sample.pdf');
+            });
+
+            // Handle comment modal
+            $('#commentModal').on('show.bs.modal', function (event) {
+                var button = $(event.relatedTarget);
+                var paperId = button.data('paper-id');
+                var existingComment = button.data('existing-comment');
+                var modal = $(this);
+                
+                // Set paper ID in hidden field
+                modal.find('#comment_paper_id').val(paperId);
+                
+                // Clear textarea
+                modal.find('#comment_text').val('');
+                
+                // Handle existing comment
+                var existingCommentDiv = modal.find('#existing_comment');
+                if (existingComment && existingComment.trim() !== '') {
+                    modal.find('#current_comment_text').text(existingComment);
+                    existingCommentDiv.show();
+                } else {
+                    existingCommentDiv.hide();
+                }
+            });
+
+            // Optional: Clear modal when closed
+            $('#commentModal').on('hidden.bs.modal', function () {
+                $(this).find('#comment_text').val('');
+                $(this).find('#existing_comment').hide();
             });
         });
     </script>

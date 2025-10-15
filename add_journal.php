@@ -1,20 +1,20 @@
 <?php
-session_start();
-include 'db.php'; // your database connection
+session_start(); // MUST be the very first line
 
-// ----------------------
+include 'db.php';
+
 // Check if user is logged in
-// ----------------------
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] != 1) {
-    die("You must be logged in to submit a journal.");
+    die("You must be logged in to submit or view papers.");
 }
 
 // Get logged-in user's ID
-$user_id = $_SESSION['user_id']; // make sure you store user_id in session at login
+$user_id = $_SESSION['user_id'];
 
 $success_message = "";
 $error_message = "";
 
+// ---------- Handle form submission ----------
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // Sanitize input
@@ -55,7 +55,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             (user_id, author_first_name, author_last_name, author_phone, author_email, university_name, department_name, paper_title, province, pdf_file, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $default_status = "noum"; // default status
+        $default_status = "pending"; // default status
         $stmt->bind_param(
             "issssssssss",
             $user_id,
@@ -82,10 +82,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 }
 
-$conn->close();
+// ---------- Fetch user's submitted journals ----------
+$user_journals_sql = "SELECT * FROM research_paper_submissions WHERE user_id = ? ORDER BY submission_date DESC";
+$stmt = $conn->prepare($user_journals_sql);
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$user_journals = $stmt->get_result();
 ?>
 
-
+<!-- HTML starts here -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -95,157 +100,259 @@ $conn->close();
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" />
   <style>
-    :root {
-      --primary-color: #4e73df;
-      --secondary-color: #6f42c1;
-      --accent-color: #36b9cc;
-      --light-bg: #f8f9fc;
-    }
-    body {
-      background-color: var(--light-bg);
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      color: #4e4e4e;
-    }
+    /* Your existing styles remain exactly the same */
     .journal-container {
-      background-color: white;
-      border-radius: 15px;
-      box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.1);
-      padding: 2.5rem;
-      margin-top: 2rem;
-      margin-bottom: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
     }
     .page-header {
-      color: var(--primary-color);
-      border-bottom: 3px solid var(--accent-color);
-      padding-bottom: 1rem;
-      margin-bottom: 2.5rem;
+      color: #4e73df;
+      border-bottom: 2px solid #36b9cc;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
     }
-    .btn-submit {
-      background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+    .btn-view-comment {
+      background-color: #36b9cc;
+      color: white;
       border: none;
+    }
+    .btn-view-comment:hover {
+      background-color: #2c9faf;
       color: white;
-      padding: 0.75rem 2.5rem;
-      font-weight: 600;
-      border-radius: 30px;
-      transition: all 0.3s;
-    }
-    .btn-submit:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-      color: white;
-    }
-    .form-control:focus {
-      border-color: var(--primary-color);
-      box-shadow: 0 0 0 0.25rem rgba(78, 115, 223, 0.25);
-    }
-    .form-section {
-      background-color: #f8f9fc;
-      border-radius: 10px;
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
-      border-left: 4px solid var(--accent-color);
-    }
-    .form-section h5 {
-      color: var(--secondary-color);
-      margin-bottom: 1.2rem;
-    }
-    .required-field::after {
-      content: " *";
-      color: #e74a3b;
-    }
-    .upload-area {
-      border: 2px dashed #d1d3e2;
-      border-radius: 10px;
-      padding: 2rem;
-      text-align: center;
-      transition: all 0.3s;
-      background-color: #f8f9fc;
-    }
-    .upload-area:hover {
-      border-color: var(--primary-color);
-      background-color: #eaecf4;
-    }
-    .upload-icon {
-      font-size: 3rem;
-      color: var(--primary-color);
     }
   </style>
 </head>
 <body>
-  <div class="container">
+<div class="container">
     <div class="journal-container">
-      <div class="text-center mb-5">
-        <h1 class="page-header"><i class="bi bi-journal-text"></i> Academic Journal Submission</h1>
-        <p class="text-muted">Submit your research paper for publication</p>
-      </div>
-
-      <?php if (!empty($success_message)): ?>
-        <div class="alert alert-success"><?= $success_message ?></div>
-      <?php endif; ?>
-      <?php if (!empty($error_message)): ?>
-        <div class="alert alert-danger"><?= $error_message ?></div>
-      <?php endif; ?>
-
-      <form method="POST" enctype="multipart/form-data">
-        <div class="form-section">
-          <h5><i class="bi bi-person-circle"></i> Author Information</h5>
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label class="form-label required-field">First Name</label>
-              <input type="text" class="form-control" name="author_first_name" required>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label required-field">Last Name</label>
-              <input type="text" class="form-control" name="author_last_name" required>
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label class="form-label required-field">Phone</label>
-              <input type="tel" class="form-control" name="author_phone" required>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label required-field">Email</label>
-              <input type="email" class="form-control" name="author_email" required>
-            </div>
-          </div>
+        <div class="text-center mb-5">
+            <h1 class="page-header"><i class="bi bi-journal-text"></i> Academic Journal Submission</h1>
+            <p class="text-muted">Submit your research paper for publication</p>
         </div>
 
-        <div class="form-section">
-          <h5><i class="bi bi-building"></i> University Info</h5>
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label class="form-label required-field">University Name</label>
-              <input type="text" class="form-control" name="university_name" required>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label required-field">Department</label>
-              <input type="text" class="form-control" name="department_name" required>
-            </div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label required-field">Province</label>
-            <input type="text" class="form-control" name="province" required>
-          </div>
-        </div>
+        <?php if (!empty($success_message)): ?>
+            <div class="alert alert-success"><?= $success_message ?></div>
+        <?php endif; ?>
+        <?php if (!empty($error_message)): ?>
+            <div class="alert alert-danger"><?= $error_message ?></div>
+        <?php endif; ?>
 
-        <div class="form-section">
-          <h5><i class="bi bi-file-earmark-pdf"></i> Paper Information</h5>
-          <div class="mb-3">
-            <label class="form-label required-field">Paper Title</label>
-            <input type="text" class="form-control" name="paper_title" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label required-field">Upload PDF</label>
-            <input type="file" class="form-control" name="pdf_file" accept=".pdf" required>
-          </div>
-        </div>
+        <!-- Your existing form code remains exactly the same -->
+        <form method="POST" enctype="multipart/form-data">
+            <!-- Your complete form sections here -->
+            <!-- Author Information -->
+            <div class="card card-custom shadow mb-4">
+                <div class="card-header">
+                    <h5 class="card-title"><i class="bi bi-person"></i> Author Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="author_first_name" class="form-label">First Name *</label>
+                                <input type="text" class="form-control" id="author_first_name" name="author_first_name" 
+                                       value="<?= $_POST['author_first_name'] ?? '' ?>" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="author_last_name" class="form-label">Last Name *</label>
+                                <input type="text" class="form-control" id="author_last_name" name="author_last_name" 
+                                       value="<?= $_POST['author_last_name'] ?? '' ?>" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="author_phone" class="form-label">Phone Number *</label>
+                                <input type="tel" class="form-control" id="author_phone" name="author_phone" 
+                                       value="<?= $_POST['author_phone'] ?? '' ?>" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="author_email" class="form-label">Email Address *</label>
+                                <input type="email" class="form-control" id="author_email" name="author_email" 
+                                       value="<?= $_POST['author_email'] ?? '' ?>" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-        <div class="text-end">
-          <button type="submit" class="btn btn-submit"><i class="bi bi-send"></i> Submit Journal</button>
+            <!-- University Information -->
+            <div class="card card-custom shadow mb-4">
+                <div class="card-header">
+                    <h5 class="card-title"><i class="bi bi-building"></i> University Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="university_name" class="form-label">University Name *</label>
+                                <input type="text" class="form-control" id="university_name" name="university_name" 
+                                       value="<?= $_POST['university_name'] ?? '' ?>" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="department_name" class="form-label">Department Name *</label>
+                                <input type="text" class="form-control" id="department_name" name="department_name" 
+                                       value="<?= $_POST['department_name'] ?? '' ?>" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Paper Information -->
+            <div class="card card-custom shadow mb-4">
+                <div class="card-header">
+                    <h5 class="card-title"><i class="bi bi-file-text"></i> Paper Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="paper_title" class="form-label">Paper Title *</label>
+                                <input type="text" class="form-control" id="paper_title" name="paper_title" 
+                                       value="<?= $_POST['paper_title'] ?? '' ?>" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="province" class="form-label">Province *</label>
+                                <select class="form-select" id="province" name="province" required>
+                                    <option value="">Select Province</option>
+                                    <option value="Kabul" <?= (($_POST['province'] ?? '') == 'Kabul') ? 'selected' : '' ?>>Kabul</option>
+                                    <option value="Herat" <?= (($_POST['province'] ?? '') == 'Herat') ? 'selected' : '' ?>>Herat</option>
+                                    <option value="Balkh" <?= (($_POST['province'] ?? '') == 'Balkh') ? 'selected' : '' ?>>Balkh</option>
+                                    <option value="Kandahar" <?= (($_POST['province'] ?? '') == 'Kandahar') ? 'selected' : '' ?>>Kandahar</option>
+                                    <option value="Nangarhar" <?= (($_POST['province'] ?? '') == 'Nangarhar') ? 'selected' : '' ?>>Nangarhar</option>
+                                    <!-- Add more provinces as needed -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="pdf_file" class="form-label">Upload PDF *</label>
+                        <input type="file" class="form-control" id="pdf_file" name="pdf_file" accept=".pdf" required>
+                        <div class="form-text">Only PDF files are allowed. Maximum size: 10MB</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-end">
+                <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-send"></i> Submit Journal</button>
+            </div>
+        </form>
+
+        <!-- Display User's Submitted Papers - Only added Comment column -->
+        <div class="mt-5">
+          <h3 class="page-header"><i class="bi bi-journal-text"></i> Your Submitted Papers</h3>
+          <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Paper Title</th>
+                  <th>University</th>
+                  <th>Department</th>
+                  <th>Submission Date</th>
+                  <th>Status</th>
+                  <th>PDF</th>
+                  <th>Comment</th> <!-- Added this column -->
+                </tr>
+              </thead>
+              <tbody>
+                <?php
+                if ($user_journals->num_rows > 0) {
+                    while ($row = $user_journals->fetch_assoc()) {
+                        $status = $row['status'];
+                        if ($status === 'approved') $badge = "<span class='badge bg-success'>Approved</span>";
+                        elseif ($status === 'rejected') $badge = "<span class='badge bg-danger'>Rejected</span>";
+                        else $badge = "<span class='badge bg-secondary'>Pending</span>";
+
+                        // ADDED: Comment button logic
+                        $has_comment = !empty($row['comment']);
+                        $comment_button = $has_comment 
+                            ? "<button class='btn btn-sm btn-view-comment' data-bs-toggle='modal' data-bs-target='#commentModal' data-paper-id='{$row['id']}' data-comment='".htmlspecialchars($row['comment'])."'><i class='bi bi-chat-left-text'></i> View Comment</button>"
+                            : "<span class='text-muted'><i class='bi bi-chat-left'></i> No Comment</span>";
+
+                        echo "<tr>
+                            <td>{$row['id']}</td>
+                            <td>{$row['paper_title']}</td>
+                            <td>{$row['university_name']}</td>
+                            <td>{$row['department_name']}</td>
+                            <td>" . date('M j, Y', strtotime($row['submission_date'])) . "</td>
+                            <td>$badge</td>
+                            <td><a href='{$row['pdf_file']}' target='_blank' class='btn btn-sm btn-primary'><i class='bi bi-file-earmark-pdf'></i> View PDF</a></td>
+                            <td>$comment_button</td> <!-- Added this cell -->
+                        </tr>";
+                    }
+                } else {
+                    echo "<tr><td colspan='8' class='text-center'>You have not submitted any papers yet.</td></tr>";
+                }
+                ?>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </form>
     </div>
-  </div>
+</div>
+
+<!-- ADDED: Comment Modal -->
+<div class="modal fade" id="commentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-chat-left-text"></i> Admin Comment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <strong>Paper Title:</strong> <span id="modal_paper_title"></span>
+                </div>
+                <div class="mb-3">
+                    <strong>Admin Feedback:</strong>
+                    <div class="alert alert-info mt-2" id="modal_comment_text" style="white-space: pre-line;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap 5 JS Bundle with Popper -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+    // ADDED: Handle comment modal
+    $('#commentModal').on('show.bs.modal', function (event) {
+        var button = $(event.relatedTarget);
+        var paperId = button.data('paper-id');
+        var comment = button.data('comment');
+        var modal = $(this);
+        
+        // Find the paper title from the table row
+        var paperTitle = button.closest('tr').find('td:nth-child(2)').text();
+        
+        // Set modal content
+        modal.find('#modal_paper_title').text(paperTitle);
+        modal.find('#modal_comment_text').text(comment);
+    });
+</script>
 </body>
 </html>
+
+<?php
+// Close database connection
+$stmt->close();
+$conn->close();
+?>

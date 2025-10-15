@@ -22,7 +22,7 @@
                 <p class="hero-description">Discover how emerging technologies are reshaping industries and creating new opportunities for growth and transformation in the digital age.</p>
                 <div class="hero-buttons">
                     <a href="login.php" class="btn btn-outline">Login</a>
-                    <a href="add_journal.php" class="btn btn-primary">Share your research paper</a>
+          <a href="register.php" class="btn btn-primary">Create account to publish</a>
                 </div>
             </div>
             <div class="hero-image">
